@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Financeiro - Aprovação de PIX</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>📊 Painel Financeiro (Aprovação PIX)</h2>
+      <button onclick="carregarPedidos()" class="btn btn-outline-primary btn-sm">🔄 Atualizar Lista</button>
+    </div>
+
+    <div class="card shadow-sm p-4">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>Data</th>
+              <th>Evento</th>
+              <th>Comprador</th>
+              <th>CPF</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-pedidos">
+            <!-- Linhas inseridas via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function carregarPedidos() {
+      try {
+        const res = await fetch('/api/admin/pedidos');
+        const pedidos = await res.json();
+        
+        const tbody = document.getElementById('tabela-pedidos');
+        tbody.innerHTML = pedidos.map(p => `
+          <tr>
+            <td>${new Date(p.created_at).toLocaleString('pt-BR')}</td>
+            <td>${p.evento_titulo}</td>
+            <td><strong>${p.nome_comprador}</strong></td>
+            <td>${p.cpf_comprador}</td>
+            <td>R$ ${parseFloat(p.valor_total).toFixed(2)}</td>
+            <td>
+              <span class="badge ${p.status === 'APROVADO' ? 'bg-success' : 'bg-warning text-dark'}">
+                ${p.status}
+              </span>
+            </td>
+            <td>
+              ${p.status === 'PENDENTE' ? `
+                <button onclick="aprovarPix('${p.id}')" class="btn btn-sm btn-success fw-bold">
+                  ✓ Aprovar PIX
+                </button>
+              ` : '<span class="text-muted small">Processado</span>'}
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        alert('Erro ao carregar lista de pedidos.');
+      }
+    }
+
+    async function aprovarPix(id) {
+      if(!confirm('Confirma que o valor deste PIX deu entrada no extrato bancário?')) return;
+
+      try {
+        const res = await fetch(`/api/admin/pedidos/${id}/aprovar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmado_por: 'Operador Voluntário' })
+        });
+
+        const data = await res.json();
+        if(res.ok) {
+          alert('PIX aprovado e QR Code do ingresso gerado com sucesso!');
+          carregarPedidos();
+        } else {
+          alert('Erro: ' + data.error);
+        }
+      } catch (err) {
+        alert('Erro ao aprovar o pedido.');
+      }
+    }
+
+    carregarPedidos();
+  </script>
+</body>
+</html>
