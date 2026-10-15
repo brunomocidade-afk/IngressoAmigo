@@ -59,9 +59,10 @@ app.post('/api/pedidos', async (req, res) => {
 app.get('/api/admin/pedidos', async (req, res) => {
   try {
     const queryText = `
-      SELECT p.*, e.titulo as evento_titulo 
+      SELECT p.*, e.titulo as evento_titulo, i.codigo_hash 
       FROM pedidos p
       JOIN eventos e ON e.id = p.evento_id
+      LEFT JOIN ingressos i ON i.pedido_id = p.id
       ORDER BY p.created_at DESC;
     `;
     const { rows } = await db.query(queryText);
