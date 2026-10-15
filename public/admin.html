@@ -54,40 +54,73 @@
 
   <script>
     async function carregarPedidos() {
-      try {
-        const res = await fetch('/api/admin/pedidos');
-        const pedidos = await res.json();
-        
-        const tbody = document.getElementById('tabela-pedidos');
-        tbody.innerHTML = pedidos.map(p => `
-          <tr>
-            <td>${new Date(p.created_at).toLocaleString('pt-BR')}</td>
-            <td>${p.evento_titulo}</td>
-            <td><strong>${p.nome_comprador}</strong></td>
-            <td>${p.cpf_comprador}</td>
-            <td>R$ ${parseFloat(p.valor_total).toFixed(2)}</td>
-            <td>
-              <span class="badge ${p.status === 'APROVADO' ? 'bg-success' : 'bg-warning text-dark'}">
-                ${p.status}
-              </span>
-            </td>
-            <td>
-              ${p.status === 'PENDENTE' ? `
-                <button onclick="aprovarPix('${p.id}')" class="btn btn-sm btn-success fw-bold">
-                  ✓ Aprovar PIX
-                </button>
-              ` : p.codigo_hash ? `
-                <button onclick="verQRCode('${p.codigo_hash}', '${p.nome_comprador}')" class="btn btn-sm btn-outline-primary fw-bold">
-                  🔍 Ver QR Code
-                </button>
-              ` : '<span class="text-muted small">Processado</span>'}
-            </td>
-          </tr>
-        `).join('');
-      } catch (err) {
-        alert('Erro ao carregar lista de pedidos.');
-      }
-    }
+  try {
+    const res = await fetch('/api/admin/pedidos');
+    const pedidos = await res.json();
+    
+    const tbody = document.getElementById('tabela-pedidos');
+    tbody.innerHTML = pedidos.map(p => `
+      <tr>
+        <td>${new Date(p.created_at).toLocaleString('pt-BR')}</td>
+        <td>${p.evento_titulo}</td>
+        <td><strong>${p.nome_comprador}</strong></td>
+        <td>${p.cpf_comprador}</td>
+        <td>R$ ${parseFloat(p.valor_total).toFixed(2)}</td>
+        <td>
+          <span class="badge ${p.status === 'APROVADO' ? 'bg-success' : 'bg-warning text-dark'}">
+            ${p.status}
+          </span>
+        </td>
+        <td>
+          ${p.status === 'PENDENTE' ? `
+            <button onclick="aprovarPix('${p.id}')" class="btn btn-sm btn-success fw-bold">
+              ✓ Aprovar PIX
+            </button>
+          ` : p.codigo_hash ? `
+            <div class="btn-group" role="group">
+              <button onclick="verQRCode('${p.codigo_hash}', '${p.nome_comprador}')" class="btn btn-sm btn-outline-primary fw-bold">
+                🔍 QR Code
+              </button>
+              <button onclick="enviarWhatsApp('${p.whatsapp \vert{}\vert{} ''}', '${p.nome_comprador}', '${p.evento_titulo}', '${p.codigo_hash}')" class="btn btn-sm btn-success fw-bold">
+                📲 Whats
+              </button>
+            </div>
+          ` : '<span class="text-muted small">Processado</span>'}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    alert('Erro ao carregar lista de pedidos.');
+  }
+}
+
+    // Função para abrir o WhatsApp com mensagem formatada
+function enviarWhatsApp(whatsapp, nome, eventoTitulo, codigoHash) {
+  if (!whatsapp) {
+    alert('Comprador não cadastrou número de WhatsApp.');
+    return;
+  }
+
+  // Remove caracteres não numéricos (espaços, parênteses, traços)
+  let numeroLimpo = whatsapp.replace(/\D/g, '');
+
+  // Adiciona o código do país (+55) se não estiver presente
+  if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
+    numeroLimpo = '55' + numeroLimpo;
+  }
+
+  // Link do QR Code
+  const urlQrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${codigoHash}`;
+
+  // Mensagem formatada para o WhatsApp
+  const mensagem = `Olá, *${nome}*! 🎉\n\nSeu pagamento PIX para o evento *${eventoTitulo}* foi confirmado com sucesso!\n\nAqui está o link para visualizar o seu *QR Code* de entrada:\n${urlQrCode}\n\nApresente este QR Code na portaria do evento. Bom evento! 🎟️`;
+
+  // Monta a URL da API do WhatsApp
+  const waUrl = `https://wa.me/${numeroLimpo}?text=${encodeURIComponent(mensagem)}`;
+
+  // Abre o WhatsApp em uma nova aba
+  window.open(waUrl, '_blank');
+}
 
     function verQRCode(codigoHash, nomeComprador) {
       if (!codigoHash) {
