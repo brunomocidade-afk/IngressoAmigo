@@ -51,36 +51,40 @@
 
   <script>
     async function carregarPedidos() {
-      try {
-        const res = await fetch('/api/admin/pedidos');
-        const pedidos = await res.json();
-        
-        const tbody = document.getElementById('tabela-pedidos');
-        tbody.innerHTML = pedidos.map(p => `
-          <tr>
-            <td>${new Date(p.created_at).toLocaleString('pt-BR')}</td>
-            <td>${p.evento_titulo}</td>
-            <td><strong>${p.nome_comprador}</strong></td>
-            <td>${p.cpf_comprador}</td>
-            <td>R$ ${parseFloat(p.valor_total).toFixed(2)}</td>
-            <td>
-              <span class="badge ${p.status === 'APROVADO' ? 'bg-success' : 'bg-warning text-dark'}">
-                ${p.status}
-              </span>
-            </td>
-            <td>
-              ${p.status === 'PENDENTE' ? `
-                <button onclick="aprovarPix('${p.id}')" class="btn btn-sm btn-success fw-bold">
-                  ✓ Aprovar PIX
-                </button>
-              ` : '<span class="text-muted small">Processado</span>'}
-            </td>
-          </tr>
-        `).join('');
-      } catch (err) {
-        alert('Erro ao carregar lista de pedidos.');
-      }
-    }
+  try {
+    const res = await fetch('/api/admin/pedidos');
+    const pedidos = await res.json();
+    
+    const tbody = document.getElementById('tabela-pedidos');
+    tbody.innerHTML = pedidos.map(p => `
+      <tr>
+        <td>${new Date(p.created_at).toLocaleString('pt-BR')}</td>
+        <td>${p.evento_titulo}</td>
+        <td><strong>${p.nome_comprador}</strong></td>
+        <td>${p.cpf_comprador}</td>
+        <td>R$ ${parseFloat(p.valor_total).toFixed(2)}</td>
+        <td>
+          <span class="badge ${p.status === 'APROVADO' ? 'bg-success' : 'bg-warning text-dark'}">
+            ${p.status}
+          </span>
+        </td>
+        <td>
+          ${p.status === 'PENDENTE' ? `
+            <button onclick="aprovarPix('${p.id}')" class="btn btn-sm btn-success fw-bold">
+              ✓ Aprovar PIX
+            </button>
+          ` : p.codigo_hash ? `
+            <button onclick="verQRCode('${p.codigo_hash}', '${p.nome_comprador}')" class="btn btn-sm btn-outline-primary fw-bold">
+              🔍 Ver QR Code
+            </button>
+          ` : '<span class="text-muted small">Processado</span>'}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    alert('Erro ao carregar lista de pedidos.');
+  }
+}
 
     function verQRCode(codigoHash, nomeComprador) {
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${codigoHash}`;
@@ -90,7 +94,7 @@
         const modal = new bootstrap.Modal(document.getElementById('modalQRCode'));
         modal.show();
     }
-    
+
     async function aprovarPix(id) {
       if(!confirm('Confirma que o valor deste PIX deu entrada no extrato bancário?')) return;
 
