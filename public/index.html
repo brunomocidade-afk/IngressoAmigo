@@ -54,6 +54,19 @@
     </div>
   </div>
 
+  <!-- Área de Confirmação e QR Code -->
+<div id="area-ingresso" class="card shadow-sm p-4 mb-4 border-success text-center d-none">
+  <h5 class="card-title fw-bold text-success mb-3">🎉 Ingresso Gerado com Sucesso!</h5>
+  <p class="text-muted small">Apresente o QR Code abaixo na portaria do evento:</p>
+
+  <!-- Imagem Dinâmica do QR Code -->
+  <div class="my-3">
+    <img id="img-qrcode" src="" alt="QR Code do Ingresso" class="img-thumbnail shadow-sm" style="max-width: 220px;">
+  </div>
+
+  <p class="small text-secondary mb-0">Código Hash: <code id="hash-exibido"></code></p>
+</div>
+
   <script>
     let eventos = [];
 
@@ -88,6 +101,14 @@
           <strong>Chave PIX da Entidade:</strong> <code>${evento.chave_pix}</code>
         `;
       }
+    }
+
+    // Exemplo de função para exibir o QR Code após obter o código_hash
+    function exibirQRCode(codigoHash) {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${codigoHash}`;
+  document.getElementById('img-qrcode').src = qrUrl;
+  document.getElementById('hash-exibido').innerText = codigoHash;
+  document.getElementById('area-ingresso').classList.remove('d-none');
     }
 
     document.getElementById('select-evento').addEventListener('change', atualizarDetalhes);

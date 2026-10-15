@@ -35,6 +35,20 @@
     </div>
   </div>
 
+  <!-- Modal de Exibição do QR Code -->
+<div class="modal fade" id="modalQRCode" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center p-4">
+      <h5 class="fw-bold mb-3">🎫 QR Code do Ingresso</h5>
+      <div id="modal-body-qrcode" class="my-3">
+        <img id="modal-img-qr" src="" class="img-thumbnail" style="max-width: 250px;">
+      </div>
+      <p class="small text-muted mb-3" id="modal-nome-comprador"></p>
+      <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">Fechar</button>
+    </div>
+  </div>
+</div>
+
   <script>
     async function carregarPedidos() {
       try {
@@ -68,6 +82,15 @@
       }
     }
 
+    function verQRCode(codigoHash, nomeComprador) {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${codigoHash}`;
+        document.getElementById('modal-img-qr').src = qrUrl;
+        document.getElementById('modal-nome-comprador').innerText = `Comprador: ${nomeComprador}`;
+        
+        const modal = new bootstrap.Modal(document.getElementById('modalQRCode'));
+        modal.show();
+    }
+    
     async function aprovarPix(id) {
       if(!confirm('Confirma que o valor deste PIX deu entrada no extrato bancário?')) return;
 
