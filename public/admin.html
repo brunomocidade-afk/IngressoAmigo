@@ -53,13 +53,16 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
-    async function carregarPedidos() {
+    // Variável global para armazenar os pedidos carregados
+window.listaPedidos = [];
+
+async function carregarPedidos() {
   try {
     const res = await fetch('/api/admin/pedidos');
-    const pedidos = await res.json();
+    window.listaPedidos = await res.json();
     
     const tbody = document.getElementById('tabela-pedidos');
-    tbody.innerHTML = pedidos.map(p => `
+    tbody.innerHTML = window.listaPedidos.map(p => `
       <tr>
         <td>${new Date(p.created_at).toLocaleString('pt-BR')}</td>
         <td>${p.evento_titulo}</td>
@@ -81,7 +84,7 @@
               <button onclick="verQRCode('${p.codigo_hash}', '${p.nome_comprador}')" class="btn btn-sm btn-outline-primary fw-bold">
                 🔍 QR Code
               </button>
-              <button onclick="enviarWhatsApp('${p.whatsapp \vert{}\vert{} ''}', '${p.nome_comprador}', '${p.evento_titulo}', '${p.codigo_hash}')" class="btn btn-sm btn-success fw-bold">
+              <button onclick="enviarWhatsAppPorId('${p.id}')" class="btn btn-sm btn-success fw-bold">
                 📲 Whats
               </button>
             </div>
@@ -92,6 +95,33 @@
   } catch (err) {
     alert('Erro ao carregar lista de pedidos.');
   }
+}
+function enviarWhatsAppPorId(pedidoId) {
+  // Localiza o pedido pelo ID na lista armazenada na memória
+  const pedido = window.listaPedidos.find(p => p.id === pedidoId);
+  if (!pedido) return;
+
+  const whatsapp = pedido.whatsapp || '';
+  if (!whatsapp) {
+    alert('Comprador não cadastrou número de WhatsApp.');
+    return;
+  }
+
+  // Remove caracteres não numéricos
+  let numeroLimpo = whatsapp.replace(/\D/g, '');
+
+  // Adiciona o código do país (+55) se necessário
+  if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
+    numeroLimpo = '55' + numeroLimpo;
+  }
+
+  // Link do QR Code e Mensagem
+  const urlQrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${pedido.codigo_hash}`;
+  const mensagem = `Olá, *${pedido.nome_comprador}*! 🎉\n\nSeu pagamento PIX para o evento *${pedido.evento_titulo}* foi confirmado com sucesso!\n\nAqui está o link para visualizar o seu *QR Code* de entrada:\n${urlQrCode}\n\nApresente este QR Code na portaria do evento. Bom evento! 🎟️`;
+
+  // Abre a API do WhatsApp
+  const waUrl = `https://wa.me/${numeroLimpo}?text=${encodeURIComponent(mensagem)}`;
+  window.open(waUrl, '_blank');
 }
 
     // Função para abrir o WhatsApp com mensagem formatada
