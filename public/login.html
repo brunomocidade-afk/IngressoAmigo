@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Aprovador - Ingresso Amigo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .card-login {
+      max-width: 420px;
+      margin: 80px auto;
+      border-radius: 12px;
+    }
+    .inputs-token input {
+      letter-spacing: 8px;
+      font-size: 24px;
+      text-align: center;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body class="bg-light">
+
+  <div class="container">
+    <div class="card card-login shadow-sm p-4 bg-white">
+      <div class="text-center mb-4">
+        <h3 class="fw-bold text-primary">🤝 Ingresso Amigo</h3>
+        <p class="text-muted small">Acesso Restrito ao Painel Aprovador</p>
+      </div>
+
+      <!-- ALERTA DE MENSAGENS -->
+      <div id="alert-box" class="alert d-none" role="alert"></div>
+
+      <!-- ETAPA 1: DIGITAR E-MAIL -->
+      <form id="form-email">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">E-mail Cadastrado</label>
+          <input type="email" id="email" class="form-control form-control-lg" required placeholder="seu-email@entidade.org">
+          <div class="form-text">Envraremos um código de 6 dígitos para autenticação.</div>
+        </div>
+        <button type="submit" id="btn-enviar-email" class="btn btn-primary btn-lg w-100 fw-bold">
+          📩 Enviar Código por E-mail
+        </button>
+      </form>
+
+      <!-- ETAPA 2: DIGITAR TOKEN DE 6 DÍGITOS (OCULTO INICIALMENTE) -->
+      <form id="form-token" class="d-none">
+        <div class="mb-3 text-center">
+          <label class="form-label fw-semibold">Código de Acesso (6 dígitos)</label>
+          <div class="inputs-token">
+            <input type="text" id="token-input" class="form-control form-control-lg" maxlength="6" pattern="[0-9]{6}" required placeholder="000000">
+          </div>
+          <div class="form-text mt-2">Confira o código enviado para <strong id="email-destino"></strong>. Válido por 15 minutos.</div>
+        </div>
+        <button type="submit" id="btn-validar-token" class="btn btn-success btn-lg w-100 fw-bold mb-2">
+          🔑 Confirmar e Entrar
+        </button>
+        <button type="button" onclick="voltarParaEmail()" class="btn btn-link w-100 text-secondary text-decoration-none small">
+          ← Usar outro e-mail
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+  <script>
+    let emailSalvo = '';
+
+    // Utilitário para exibir mensagens
+    function exibirMensagem(texto, tipo = 'danger') {
+      const box = document.getElementById('alert-box');
+      box.className = `alert alert-${tipo}`;
+      box.innerText = texto;
+      box.classList.remove('d-none');
+    }
+
+    function limparMensagem() {
+      document.getElementById('alert-box').classList.add('d-none');
+    }
+
+    // PASSO 1: Solicitar Token por E-mail
+    document.getElementById('form-email').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      limparMensagem();
+
+      const email = document.getElementById('email').value.trim();
+      const btn = document.getElementById('btn-enviar-email');
+
+      btn.disabled = true;
+      btn.innerHTML = 'Aguarde, enviando...';
+
+      try {
+        const res = await fetch('/api/auth/solicitar-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          emailSalvo = email;
+          document.getElementById('email-destino').innerText = email;
+          document.getElementById('form-email').classList.add('d-none');
+          document.getElementById('form-token').classList.remove('d-none');
+          exibirMensagem('Código enviado com sucesso! Verifique seu e-mail.', 'success');
+        } else {
+          exibirMensagem(data.error || 'Erro ao enviar e-mail.');
+        }
+      } catch (err) {
+        exibirMensagem('Erro de conexão com o servidor.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '📩 Enviar Código por E-mail';
+      }
+    });
+
+    // PASSO 2: Validar Token e Salvar JWT
+    document.getElementById('form-token').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      limparMensagem();
+
+      const token = document.getElementById('token-input').value.trim();
+      const btn = document.getElementById('btn-validar-token');
+
+      btn.disabled = true;
+      btn.innerHTML = 'Validando...';
+
+      try {
+        const res = await fetch('/api/auth/validar-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailSalvo, token })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          // Salva o Token JWT no navegador
+          localStorage.setItem('admin_token', data.token);
+          localStorage.setItem('admin_nome', data.nome);
+
+          exibirMensagem('Acesso liberado! Redirecionando...', 'success');
+          
+          setTimeout(() => {
+            window.location.href = '/admin.html';
+          }, 1200);
+        } else {
+          exibirMensagem(data.error || 'Código incorreto ou expirado.');
+        }
+      } catch (err) {
+        exibirMensagem('Erro de conexão com o servidor.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🔑 Confirmar e Entrar';
+      }
+    });
+
+    function voltarParaEmail() {
+      limparMensagem();
+      document.getElementById('form-token').classList.add('d-none');
+      document.getElementById('form-email').classList.remove('d-none');
+    }
+  </script>
+</body>
+</html>
