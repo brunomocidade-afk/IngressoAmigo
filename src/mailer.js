@@ -8,7 +8,7 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
   },
-  connectionTimeout: 10000 // 10 segundos de tempo limite
+  connectionTimeout: 10000 // 10 segundos de limite de conexão
 });
 
 async function enviarTokenEmail(emailDestino, token) {
