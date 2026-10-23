@@ -159,7 +159,7 @@ app.get('/api/admin/pedidos', autenticarAdmin, async (req, res) => {
     console.error('Erro ao buscar pedidos:', err);
     res.status(500).json({ error: 'Erro ao listar pedidos' });
   }
-});
+}); 
 
 // -----------------------------------------------------------------------------
 // 2. ROTAS PÚBLICAS DO SISTEMA
