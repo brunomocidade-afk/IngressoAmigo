@@ -86,7 +86,7 @@ app.post('/api/auth/solicitar-token', async (req, res) => {
   }
 });
 
-// B. VALIDAR TOKEN E GERAR JWT DE SESSÃO
+// VALIDAR TOKEN E GERAR SESSÃO (JWT)
 app.post('/api/auth/validar-token', async (req, res) => {
   const { email, token } = req.body;
 
@@ -109,20 +109,20 @@ app.post('/api/auth/validar-token', async (req, res) => {
     // Marcar token como utilizado
     await db.query('UPDATE tokens_acesso SET usado = true WHERE id = $1', [tokenRes.rows[0].id]);
 
-    // Buscar dados do organizador e seus eventos permitidos
-    const orgRes = await db.query(`
-      SELECT o.id, o.nome, o.email, array_agg(oe.evento_id) as eventos_permitidos
-      FROM organizadores o
-      LEFT JOIN organizadores_eventos oe ON oe.organizador_id = o.id
-      WHERE o.email = $1
-      GROUP BY o.id
-    `, [emailLimpo]);
-
+    // Buscar organizador
+    const orgRes = await db.query('SELECT id, nome, email FROM organizadores WHERE email = $1', [emailLimpo]);
     const organizador = orgRes.rows[0];
 
-    // Gerar JWT válido por 8 horas
+    // Buscar IDs dos eventos associados
+    const eventosRes = await db.query(
+      'SELECT evento_id FROM organizadores_eventos WHERE organizador_id = $1',
+      [organizador.id]
+    );
+    const eventosPermitidos = eventosRes.rows.map(r => r.evento_id);
+
+    // Gerar JWT com os IDs dos eventos
     const sessionToken = jwt.sign(
-      { id: organizador.id, email: organizador.email, eventos: organizador.eventos_permitidos },
+      { id: organizador.id, email: organizador.email, eventos: eventosPermitidos },
       JWT_SECRET,
       { expiresIn: '8h' }
     );
@@ -131,6 +131,33 @@ app.post('/api/auth/validar-token', async (req, res) => {
   } catch (err) {
     console.error('Erro ao validar token:', err);
     res.status(500).json({ error: 'Erro ao validar código.' });
+  }
+});
+
+// LISTAR PEDIDOS PARA O PAINEL ADMIN
+app.get('/api/admin/pedidos', autenticarAdmin, async (req, res) => {
+  try {
+    const eventosPermitidos = req.user.eventos || [];
+
+    // Se o organizador não tiver nenhum evento vinculado, retorna array vazio sem erro
+    if (eventosPermitidos.length === 0) {
+      return res.json([]);
+    }
+
+    const queryText = `
+      SELECT p.id, p.created_at, p.nome_comprador, p.cpf_comprador, p.whatsapp, p.valor_total, p.status,
+             e.titulo as evento_titulo, i.codigo_hash 
+      FROM pedidos p
+      JOIN eventos e ON e.id = p.evento_id
+      LEFT JOIN ingressos i ON i.pedido_id = p.id
+      WHERE p.evento_id = ANY($1::uuid[])
+      ORDER BY p.created_at DESC;
+    `;
+    const { rows } = await db.query(queryText, [eventosPermitidos]);
+    res.json(rows);
+  } catch (err) {
+    console.error('Erro ao buscar pedidos:', err);
+    res.status(500).json({ error: 'Erro ao listar pedidos' });
   }
 });
 
