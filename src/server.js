@@ -181,30 +181,42 @@ app.get('/api/eventos', async (req, res) => {
   }
 });
 
-app.get('/api/admin/pedidos', autenticarAdmin, async (req, res) => {
-  try {
-    // Garante que seja uma matriz válida, mesmo se for nula no JWT
-    const eventosPermitidos = (req.user.eventos && req.user.eventos[0] !== null) ? req.user.eventos : [];
+// 3. Criar Pedido Pendente (Comprador envia CPF/Nome e recebe os dados do PIX)
+app.post('/api/pedidos', async (req, res) => {
+  const { evento_id, cpf_comprador, nome_comprador, whatsapp, valor_total } = req.body;
 
-    if (eventosPermitidos.length === 0) {
-      // Se não tiver nenhum evento associado, retorna lista vazia sem dar erro
-      return res.json([]);
+  if (!evento_id || !cpf_comprador || !nome_comprador) {
+    return res.status(400).json({ error: 'Campos obrigatórios ausentes (evento_id, cpf, nome)' });
+  }
+
+  try {
+    let valorFinal = parseFloat(valor_total);
+
+    // Se o valor_total não veio do frontend, busca direto do evento no banco
+    if (isNaN(valorFinal) || !valorFinal) {
+      const eventoRes = await db.query('SELECT valor_ingresso FROM eventos WHERE id = $1', [evento_id]);
+      if (eventoRes.rows.length > 0 && eventoRes.rows[0].valor_ingresso) {
+        valorFinal = parseFloat(eventoRes.rows[0].valor_ingresso);
+      } else {
+        valorFinal = 0.00; // Valor padrão caso não cadastrado
+      }
     }
 
     const queryText = `
-      SELECT p.id, p.created_at, p.nome_comprador, p.cpf_comprador, p.whatsapp, p.valor_total, p.status,
-             e.titulo as evento_titulo, i.codigo_hash 
-      FROM pedidos p
-      JOIN eventos e ON e.id = p.evento_id
-      LEFT JOIN ingressos i ON i.pedido_id = p.id
-      WHERE p.evento_id = ANY($1::uuid[])
-      ORDER BY p.created_at DESC;
+      INSERT INTO pedidos (evento_id, cpf_comprador, nome_comprador, whatsapp, valor_total, status)
+      VALUES ($1, $2, $3, $4, $5, 'PENDENTE')
+      RETURNING *;
     `;
-    const { rows } = await db.query(queryText, [eventosPermitidos]);
-    res.json(rows);
+    const values = [evento_id, cpf_comprador, nome_comprador, whatsapp, valorFinal];
+    const { rows } = await db.query(queryText, values);
+
+    res.status(201).json({
+      message: 'Pedido registrado com sucesso! Aguardando confirmação do PIX.',
+      pedido: rows[0]
+    });
   } catch (err) {
-    console.error('Erro ao buscar pedidos:', err);
-    res.status(500).json({ error: 'Erro ao listar pedidos' });
+    console.error('Erro ao criar pedido:', err);
+    res.status(500).json({ error: 'Erro ao registrar pedido no banco de dados.' });
   }
 });
 // -----------------------------------------------------------------------------
