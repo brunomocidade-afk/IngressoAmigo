@@ -40,8 +40,8 @@ app.post('/api/auth/solicitar-token', async (req, res) => {
 
     res.json({ message: 'Código de acesso enviado para o seu e-mail!' });
   } catch (err) {
-    console.error('Erro ao gerar token:', err);
-    res.status(500).json({ error: 'Erro ao processar solicitação de acesso.' });
+    console.error('Erro ao enviar e-mail com token:', err);
+    res.status(500).json({ error: 'Erro ao enviar e-mail. Verifique as configurações SMTP.' });
   }
 });
 
