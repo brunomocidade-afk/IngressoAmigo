@@ -1,18 +1,11 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  },
-  connectionTimeout: 5000, // 5 segundos max
-  socketTimeout: 5000
-});
+// Inicializa a API do Resend com a chave cadastrada no ambiente
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function enviarTokenEmail(emailDestino, token) {
-  const mailOptions = {
-    from: `"Ingresso Amigo" <${process.env.SMTP_USER}>`,
+  const data = await resend.emails.send({
+    from: 'Ingresso Amigo <onboarding@resend.dev>', // Endereço padrão de testes do Resend
     to: emailDestino,
     subject: '🔑 Seu Código de Acesso - Ingresso Amigo',
     html: `
@@ -25,9 +18,13 @@ async function enviarTokenEmail(emailDestino, token) {
         <p style="font-size: 12px; color: #777;">Se você não solicitou este acesso, desconsidere este e-mail.</p>
       </div>
     `
-  };
+  });
 
-  await transporter.sendMail(mailOptions);
+  if (data.error) {
+    throw new Error(data.error.message);
+  }
+
+  return data;
 }
 
 module.exports = { enviarTokenEmail };
