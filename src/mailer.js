@@ -1,15 +1,13 @@
 const nodemailer = require('nodemailer');
 
-// Utiliza o serviço 'gmail' nativo do Nodemailer (gerencia automaticamente conexões SSL/TLS)
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
   },
-  connectionTimeout: 10000, // 10s para estabelecer conexão
-  greetingTimeout: 10000,
-  socketTimeout: 15000
+  connectionTimeout: 5000, // 5 segundos max
+  socketTimeout: 5000
 });
 
 async function enviarTokenEmail(emailDestino, token) {
