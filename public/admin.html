@@ -206,27 +206,49 @@ function enviarWhatsApp(whatsapp, nome, eventoTitulo, codigoHash) {
       modal.show();
     }
     
-    async function aprovarPix(id) {
-      if(!confirm('Confirma que o valor deste PIX deu entrada no extrato bancário?')) return;
+   async function aprovarPix(pedidoId) {
+  if (!confirm('Deseja realmente aprovar o pagamento deste PIX e liberar o ingresso?')) {
+    return;
+  }
 
-      try {
-        const res = await fetch(`/api/admin/pedidos/${id}/aprovar`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ confirmado_por: 'Operador Voluntário' })
-        });
+  const tokenSessao = localStorage.getItem('admin_token');
 
-        const data = await res.json();
-        if(res.ok) {
-          alert('PIX aprovado e QR Code do ingresso gerado com sucesso!');
-          carregarPedidos();
-        } else {
-          alert('Erro: ' + data.error);
-        }
-      } catch (err) {
-        alert('Erro ao aprovar o pedido.');
-      }
+  if (!tokenSessao) {
+    alert('Sessão expirada. Faça login novamente.');
+    window.location.href = '/login.html';
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/pedidos/${pedidoId}/aprovar`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenSessao}` // <-- ENVIA O TOKEN JWT EXIGIDO PELA ROTA
+      },
+      body: JSON.stringify({ confirmado_por: 'Operador Admin' })
+    });
+
+    const data = await res.json();
+
+    if (res.status === 401 || res.status === 403) {
+      alert('Sessão não autorizada ou expirada. Faça login novamente.');
+      localStorage.removeItem('admin_token');
+      window.location.href = '/login.html';
+      return;
     }
+
+    if (res.ok) {
+      alert('✅ PIX Aprovado com sucesso! Ingresso e QR Code gerados.');
+      carregarPedidos(); // Recarrega a tabela de pedidos
+    } else {
+      alert(data.error || 'Erro ao aprovar PIX.');
+    }
+  } catch (err) {
+    console.error('Erro ao aprovar PIX:', err);
+    alert('Erro ao conectar com o servidor para aprovação.');
+  }
+}
 
     carregarPedidos();
   </script>
