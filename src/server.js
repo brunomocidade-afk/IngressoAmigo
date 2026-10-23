@@ -211,6 +211,44 @@ app.get('/api/admin/pedidos', autenticarAdmin, async (req, res) => {
 // 3. ROTAS ADMINISTRATIVAS PROTEGIDAS
 // -----------------------------------------------------------------------------
 
+// CADASTRAR NOVO EVENTO E VINCULAR AO ORGANIZADOR LOGADO
+app.post('/api/admin/eventos', autenticarAdmin, async (req, res) => {
+  const { titulo, descricao, data_evento, valor_ingresso, local_evento, chave_pix } = req.body;
+
+  if (!titulo || !data_evento || !valor_ingresso || !chave_pix) {
+    return res.status(400).json({ error: 'Campos obrigatórios: título, data, valor e chave PIX.' });
+  }
+
+  try {
+    // 1. Inserir o novo evento no banco
+    const queryEvento = `
+      INSERT INTO eventos (titulo, descricao, data_evento, valor_ingresso, local_evento, chave_pix, ativo)
+      VALUES ($1, $2, $3, $4, $5, $6, true)
+      RETURNING *;
+    `;
+    const valuesEvento = [titulo, descricao, data_evento, valor_ingresso, local_evento, chave_pix];
+    const { rows: eventosCriados } = await db.query(queryEvento, valuesEvento);
+    const novoEvento = eventosCriados[0];
+
+    // 2. Vincular automaticamente o novo evento ao organizador logado
+    const queryVinculo = `
+      INSERT INTO organizadores_eventos (organizador_id, evento_id)
+      VALUES ($1, $2)
+      ON CONFLICT DO NOTHING;
+    `;
+    await db.query(queryVinculo, [req.user.id, novoEvento.id]);
+
+    res.status(201).json({
+      message: 'Evento cadastrado e vinculado com sucesso!',
+      evento: novoEvento
+    });
+
+  } catch (err) {
+    console.error('Erro ao cadastrar evento:', err);
+    res.status(500).json({ error: 'Erro ao cadastrar novo evento no banco de dados.' });
+  }
+});
+
 // Listar Pedidos Filtrados pelos Eventos do Organizador Logado
 app.get('/api/admin/pedidos', autenticarAdmin, async (req, res) => {
   try {
