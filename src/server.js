@@ -154,33 +154,32 @@ app.get('/api/eventos', async (req, res) => {
   }
 });
 
-// Criar Pedido Pendente (Comprador)
-app.post('/api/pedidos', async (req, res) => {
-  const { evento_id, cpf_comprador, nome_comprador, whatsapp, valor_total } = req.body;
-
-  if (!evento_id || !cpf_comprador || !nome_comprador || !valor_total) {
-    return res.status(400).json({ error: 'Campos obrigatórios ausentes.' });
-  }
-
+app.get('/api/admin/pedidos', autenticarAdmin, async (req, res) => {
   try {
-    const queryText = `
-      INSERT INTO pedidos (evento_id, cpf_comprador, nome_comprador, whatsapp, valor_total, status)
-      VALUES ($1, $2, $3, $4, $5, 'PENDENTE')
-      RETURNING *;
-    `;
-    const values = [evento_id, cpf_comprador, nome_comprador, whatsapp, valor_total];
-    const { rows } = await db.query(queryText, values);
+    // Garante que seja uma matriz válida, mesmo se for nula no JWT
+    const eventosPermitidos = (req.user.eventos && req.user.eventos[0] !== null) ? req.user.eventos : [];
 
-    res.status(201).json({
-      message: 'Pedido registrado com sucesso! Aguardando confirmação do PIX.',
-      pedido: rows[0]
-    });
+    if (eventosPermitidos.length === 0) {
+      // Se não tiver nenhum evento associado, retorna lista vazia sem dar erro
+      return res.json([]);
+    }
+
+    const queryText = `
+      SELECT p.id, p.created_at, p.nome_comprador, p.cpf_comprador, p.whatsapp, p.valor_total, p.status,
+             e.titulo as evento_titulo, i.codigo_hash 
+      FROM pedidos p
+      JOIN eventos e ON e.id = p.evento_id
+      LEFT JOIN ingressos i ON i.pedido_id = p.id
+      WHERE p.evento_id = ANY($1::uuid[])
+      ORDER BY p.created_at DESC;
+    `;
+    const { rows } = await db.query(queryText, [eventosPermitidos]);
+    res.json(rows);
   } catch (err) {
-    console.error('Erro ao criar pedido:', err);
-    res.status(500).json({ error: 'Erro ao registrar pedido' });
+    console.error('Erro ao buscar pedidos:', err);
+    res.status(500).json({ error: 'Erro ao listar pedidos' });
   }
 });
-
 // -----------------------------------------------------------------------------
 // 3. ROTAS ADMINISTRATIVAS PROTEGIDAS
 // -----------------------------------------------------------------------------
