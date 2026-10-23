@@ -54,47 +54,49 @@
 
   <script>
 
-    // Verifica se o token de sessão existe
+   // 1. Verificar se existe o token salvo no navegador
 const tokenSessao = localStorage.getItem('admin_token');
 
 if (!tokenSessao) {
-  // Se não estiver logado, redireciona para a tela de login
+  // Se não houver token, redireciona diretamente para o login
   window.location.href = '/login.html';
 }
 
-// Atualizar a requisição fetch para enviar o token no cabeçalho:
+// Guardar lista de pedidos na memória para o botão do WhatsApp
+window.listaPedidos = [];
+
+// 2. Buscar pedidos enviando o token JWT no cabeçalho
 async function carregarPedidos() {
   try {
     const res = await fetch('/api/admin/pedidos', {
+      method: 'GET',
       headers: {
-        'Authorization': `Bearer ${tokenSessao}`
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenSessao}` // <-- ENVIA O TOKEN JWT
       }
     });
 
+    // Se o token for inválido ou expirado, envia para o login
     if (res.status === 401 || res.status === 403) {
-      alert('Sessão expirada. Faça login novamente.');
+      alert('Sessão expirada ou não autorizada. Faça login novamente.');
       localStorage.removeItem('admin_token');
       window.location.href = '/login.html';
       return;
     }
 
-    window.listaPedidos = await res.json();
-    // Renderização da tabela...
-  } catch (err) {
-    alert('Erro ao carregar lista de pedidos.');
-  }
-}
+    if (!res.ok) {
+      throw new Error('Falha ao buscar pedidos no servidor.');
+    }
 
-
-    // Variável global para armazenar os pedidos carregados
-window.listaPedidos = [];
-
-async function carregarPedidos() {
-  try {
-    const res = await fetch('/api/admin/pedidos');
     window.listaPedidos = await res.json();
     
     const tbody = document.getElementById('tabela-pedidos');
+
+    if (window.listaPedidos.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhum pedido encontrado para o seu evento.</td></tr>`;
+      return;
+    }
+
     tbody.innerHTML = window.listaPedidos.map(p => `
       <tr>
         <td>${new Date(p.created_at).toLocaleString('pt-BR')}</td>
@@ -125,10 +127,13 @@ async function carregarPedidos() {
         </td>
       </tr>
     `).join('');
+
   } catch (err) {
+    console.error('Erro na requisição admin:', err);
     alert('Erro ao carregar lista de pedidos.');
   }
 }
+
 function enviarWhatsAppPorId(pedidoId) {
   // Localiza o pedido pelo ID na lista armazenada na memória
   const pedido = window.listaPedidos.find(p => p.id === pedidoId);
