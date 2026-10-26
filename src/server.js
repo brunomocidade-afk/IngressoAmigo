@@ -86,6 +86,91 @@ app.post('/api/auth/solicitar-token', async (req, res) => {
   }
 });
 
+// RELATÓRIO DE VENDAS POR EVENTO (PROTEGIDO POR JWT)
+app.get('/api/admin/relatorio', autenticarAdmin, async (req, res) => {
+  const { evento_id, status_pix } = req.query;
+
+  try {
+    const eventosPermitidos = req.user.eventos || [];
+
+    if (eventosPermitidos.length === 0) {
+      return res.json({ resumo: {}, pedidos: [] });
+    }
+
+    // Se nenhum evento específico for selecionado, usa o primeiro permitido
+    const idEventoAlvo = evento_id || eventosPermitidos[0];
+
+    // 1. Buscar informações e limites do evento
+    const eventoRes = await db.query(
+      'SELECT id, titulo, valor_ingresso, limite_ingressos, chave_pix FROM eventos WHERE id = $1',
+      [idEventoAlvo]
+    );
+
+    if (eventoRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Evento não encontrado.' });
+    }
+
+    const evento = eventoRes.rows[0];
+
+    // 2. Montar filtro por status de pagamento do PIX
+    let filtroStatus = '';
+    let params = [idEventoAlvo];
+
+    if (status_pix === 'APROVADO') {
+      filtroStatus = " AND p.status = 'APROVADO'";
+    } else if (status_pix === 'PENDENTE') {
+      filtroStatus = " AND p.status = 'PENDENTE'";
+    }
+
+    // 3. Consultar pedidos do evento
+    const queryPedidos = `
+      SELECT p.id, p.created_at, p.nome_comprador, p.cpf_comprador, p.whatsapp, p.valor_total, p.status,
+             p.confirmado_por, p.confirmado_em
+      FROM pedidos p
+      WHERE p.evento_id = $1 ${filtroStatus}
+      ORDER BY p.created_at DESC;
+    `;
+    const { rows: pedidos } = await db.query(queryPedidos, params);
+
+    // 4. Calcular métricas consolidadas
+    const queryTotais = `
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'APROVADO') as total_aprovados,
+        COUNT(*) FILTER (WHERE status = 'PENDENTE') as total_pendentes,
+        COALESCE(SUM(valor_total) FILTER (WHERE status = 'APROVADO'), 0) as receita_aprovada,
+        COALESCE(SUM(valor_total) FILTER (WHERE status = 'PENDENTE'), 0) as receita_pendente
+      FROM pedidos 
+      WHERE evento_id = $1;
+    `;
+    const { rows: totais } = await db.query(queryTotais, [idEventoAlvo]);
+    const metricas = totais[0];
+
+    const totalAprovados = parseInt(metricas.total_aprovados) || 0;
+    const limiteIngressos = evento.limite_ingressos || 0;
+    const totalDisponiveis = Math.max(0, limiteIngressos - totalAprovados);
+
+    res.json({
+      evento: {
+        titulo: evento.titulo,
+        valor_ingresso: evento.valor_ingresso,
+        limite_ingressos: limiteIngressos,
+        total_disponiveis: totalDisponiveis
+      },
+      resumo: {
+        total_aprovados: totalAprovados,
+        total_pendentes: parseInt(metricas.total_pendentes) || 0,
+        receita_aprovada: parseFloat(metricas.receita_aprovada),
+        receita_pendente: parseFloat(metricas.receita_pendente)
+      },
+      pedidos: pedidos
+    });
+
+  } catch (err) {
+    console.error('Erro ao gerar relatório:', err);
+    res.status(500).json({ error: 'Erro ao gerar relatório de vendas.' });
+  }
+});
+
 // VALIDAR TOKEN E GERAR SESSÃO (JWT)
 app.post('/api/auth/validar-token', async (req, res) => {
   const { email, token } = req.body;
